@@ -20,9 +20,15 @@ TYPES: BEGIN OF ty_out,
         act_hrs                 LIKE  catsdb-catshours,
         att_hrs                 LIKE  catsdb-catshours,
         abs_hrs                 LIKE  catsdb-catshours,
+*        EMP_CERT                TYPE  STRING,
+*        EMP_CERT_DATE           TYPE  STRING,
+*        MGR_CERT                TYPE  STRING,
+*        MGR_CERT_DATE           TYPE  STRING,
+*        MGR_BTN                 TYPE  STRING,
+*        MGR_BTN_TEXT            TYPE  STRING,
         mgr_name                LIKE  pa0001-ename,
         pp                      LIKE  pa0001-ename,
-
+*        MGR_BTN_ICON            TYPE  STRING,
         emp_cert           LIKE  pa0001-ename,
         emp_id  LIKE pa9004-emp_id,
         emp_cert_date  LIKE pa9004-emp_cert_date,
@@ -31,9 +37,20 @@ TYPES: BEGIN OF ty_out,
         mgr_id  LIKE pa9004-mgr_id,
         mgr_cert_date  LIKE pa9004-mgr_cert_date,
         mgr_cert_time  LIKE pa9004-mgr_cert_time,
-
+*        EMP_TYPE                TYPE  STRING,
+*        EMP_TYPE_COL            TYPE  WDUI_TEXTVIEW_SEM_COL,
+*        MGR_BTN_ENABLE          TYPE  WDY_BOOLEAN,
+*        EMP_REMIND              TYPE  WDY_BOOLEAN,
+*        EMP_REMIND_TOOLTIP      TYPE  STRING,
+*        EMP_CERT_ACTION         TYPE  STRING,
+*        MGR_CANCEL_BTN          TYPE  STRING,
+*        MGR_CANCEL_BTN_ICON     TYPE  STRING,
+*        MGR_CANCEL_BTN_TEXT     LIKE  STRING,
+*        MGR_CANCEL_BTN_ENABLE   TYPE  WDY_BOOLEAN,
         mgr_cert_stat TYPE icon-id,
         ee_cert_stat TYPE icon-id,
+*        cel_color  TYPE slis_t_specialcol_alv,
+*        cel_color(4) TYPE c,
         cel_color TYPE lvc_t_scol,
         begda TYPE datum,
         endda TYPE datum,
@@ -50,25 +67,42 @@ DATA: BEGIN OF alv_out4, " For ALV
         act_hrs                 LIKE  catsdb-catshours,
         att_hrs                 LIKE  catsdb-catshours,
         abs_hrs                 LIKE  catsdb-catshours,
+*        EMP_CERT                TYPE  STRING,
+*        EMP_CERT_DATE           TYPE  STRING,
+*        MGR_CERT                TYPE  STRING,
+*        MGR_CERT_DATE           TYPE  STRING,
+*        MGR_BTN                 TYPE  STRING,
+*        MGR_BTN_TEXT            TYPE  STRING,
         mgr_name                LIKE  pa0001-ename,
         pp                      LIKE  pa0001-ename,
+*        MGR_BTN_ICON            TYPE  STRING,
         emp_cert           LIKE  pa0001-ename,
-        emp_id  LIKE pa9004-emp_id,
-        emp_cert_date  LIKE pa9004-emp_cert_date,
-        emp_cert_time  LIKE pa9004-emp_cert_time,
+    emp_id  LIKE pa9004-emp_id,
+  emp_cert_date  LIKE pa9004-emp_cert_date,
+  emp_cert_time  LIKE pa9004-emp_cert_time,
         mgr_cert           LIKE  pa0001-ename,
-        mgr_id  LIKE pa9004-mgr_id,
-        mgr_cert_date  LIKE pa9004-mgr_cert_date,
-        mgr_cert_time  LIKE pa9004-mgr_cert_time,
-
-        mgr_cert_stat LIKE icon-id,
-        ee_cert_stat LIKE icon-id,
-
-        cel_color TYPE lvc_t_scol,
-        begda TYPE datum,
+    mgr_id  LIKE pa9004-mgr_id,
+  mgr_cert_date  LIKE pa9004-mgr_cert_date,
+  mgr_cert_time  LIKE pa9004-mgr_cert_time,
+*        EMP_TYPE                TYPE  STRING,
+*        EMP_TYPE_COL            TYPE  WDUI_TEXTVIEW_SEM_COL,
+*        MGR_BTN_ENABLE          TYPE  WDY_BOOLEAN,
+*        EMP_REMIND              TYPE  WDY_BOOLEAN,
+*        EMP_REMIND_TOOLTIP      TYPE  STRING,
+*        EMP_CERT_ACTION         TYPE  STRING,
+*        MGR_CANCEL_BTN          TYPE  STRING,
+*        MGR_CANCEL_BTN_ICON     TYPE  STRING,
+*        MGR_CANCEL_BTN_TEXT     LIKE  STRING,
+*        MGR_CANCEL_BTN_ENABLE   TYPE  WDY_BOOLEAN,
+  mgr_cert_stat LIKE icon-id,
+  ee_cert_stat LIKE icon-id,
+*         cel_color  TYPE slis_t_specialcol_alv,
+*        cel_color(4) TYPE c,
+      cel_color TYPE lvc_t_scol,
+      begda TYPE datum,
         endda TYPE datum,
-        ORGEH TYPE ORGEH,
-        ORGEH_2ND_TEXT TYPE stext,
+       ORGEH TYPE ORGEH,
+      ORGEH_2ND_TEXT TYPE stext,
        END OF alv_out4.
 
 TYPES: BEGIN OF emp_data_ty,
@@ -108,6 +142,13 @@ TYPES: BEGIN OF emp_data_ty,
         ORGEH TYPE ORGEH,
         ORGEH_2ND_TEXT TYPE stext,
   END OF emp_data_ty.
+
+  types: BEGIN OF recv_ty,
+    recipient TYPE ad_smtpadr,
+    pp TYPE char10,
+    manager TYPE char1,
+
+    END OF recv_ty.
 
 DATA: wa_emp_data TYPE emp_data_ty,
       it_emp_data TYPE TABLE OF emp_data_ty,
@@ -174,7 +215,8 @@ DATA: lv_t_plans TYPE plans.
 DATA: frm_pabrp TYPE pabrp,
       to_pabrp TYPE pabrp,
       frm_pabrj TYPE pabrj,
-      to_pabrj TYPE pabrj.
+      to_pabrj TYPE pabrj,
+      lv_filename TYPE text200.
 
 DATA: it_pernrs TYPE TABLE OF pernr_d,
       chosen_objects LIKE hrsobid OCCURS 0 WITH HEADER LINE.
@@ -183,7 +225,13 @@ DATA: custom_container TYPE REF TO cl_gui_custom_container,
       alv_grid TYPE REF TO cl_gui_alv_grid,
       ok_code LIKE sy-ucomm,
       container_name TYPE scrfname VALUE 'GRID_01',
-      o_dyndoc_id  TYPE REF TO cl_dd_document.
+      o_dyndoc_id  TYPE REF TO cl_dd_document,
+      s_layout              TYPE LVC_S_LAYO,
+      fcat TYPE LVC_T_FCAT,
+      gro_doc_container TYPE REF TO cl_gui_docking_container,
+      w_spono LIKE tsp01-rqident,
+      it_tracker TYPE TABLE OF recv_ty,
+      wa_tracker TYPE recv_ty.
 
 
 *&---------------------------------------------------------------------*
@@ -233,6 +281,20 @@ CLASS lcl_event_receiver IMPLEMENTATION.
       APPEND l_toolbar TO e_object->mt_toolbar.
     ENDIF.
 
+
+*    READ TABLE e_object->mt_toolbar WITH KEY function = 'EPDF'
+*    TRANSPORTING NO FIELDS.
+*
+*    IF sy-subrc <> 0.
+*      l_toolbar-function = 'EPDF'.
+*      l_toolbar-icon =  ICON_EXPORT.
+*      l_toolbar-quickinfo = 'Export to PDF'.
+*      l_toolbar-disabled = space.
+*      APPEND l_toolbar TO e_object->mt_toolbar.
+*    ENDIF.
+
+
+
     CLEAR l_toolbar.
   ENDMETHOD.
 
@@ -260,7 +322,7 @@ CLASS lcl_event_receiver IMPLEMENTATION.
                wa_outtab-mgr_cert <> 'Approved'.
                PERFORM send_email USING wa_outtab e_ucomm.
              ELSE.
-*               MESSAGE 'Some emails not sent' TYPE 'I'.
+               MESSAGE 'Some emails not sent' TYPE 'S'.
              ENDIF.
 
 
@@ -270,8 +332,9 @@ CLASS lcl_event_receiver IMPLEMENTATION.
           MESSAGE 'Please select one or more rows' TYPE 'S'.
 *          set SCREEN 100.
         ENDIF.
-
-
+*
+*    WHEN 'EPDF'.
+*      PERFORM save_pdf.
     ENDCASE.
   ENDMETHOD.
 
